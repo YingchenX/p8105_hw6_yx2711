@@ -48,24 +48,56 @@ weather_df =
 ```
 
 # Problem 2
+
+Upload the `homicide-data` and create a `city_state` variable and a binary outcome `resolved_status` to indicate whether the homicide is solved. Omit a few `city_state` observations. Mutate a few character variables as factor variables or numeric variable for further analysis.
 ```{r}
 homicide = read.csv("data/homicide-data.csv") %>% 
   janitor::clean_names() %>% 
   mutate(
     city_state = str_c(city, ", ", state),
-    solved_status = case_when(
-      disposition %in% c("Closed without arrest", "Open/No arrest") ~ "No",
-      disposition == "Closed by arrest" ~ "Yes"
-    )
+    resolved_status = case_when(
+      disposition %in% c("Closed without arrest", "Open/No arrest") ~ "0",
+      disposition == "Closed by arrest" ~ "1"
+    ),
+    resolved_status = as.factor(resolved_status),
+    victim_age = as.numeric(victim_age),
+    victim_race = as.factor(victim_race),
+    victim_sex = as.factor(victim_sex)
   ) %>% 
   filter(
     !city_state %in% c("Dallas, TX", "Phoenix, AZ", "Kansas City, MO", "Tulsa, AL")
-  )
-
-homicide_analysis = homicide %>% 
-  filter(victim_race %in% c("White", "Black")) %>% 
-  mutate(victim_age = as.numeric(victim_age))
+  ) %>% 
+  drop_na(victim_age)
 ```
+
+
+Filter the analysis for whom in `Baltimore, MD` and `victim_race` is `White` or `Black`.
+Fit logistic regression using `glm`.
+```{r}
+homicide_analysis = homicide %>% 
+  filter(
+    victim_race %in% c("White", "Black"),
+    city_state == "Baltimore, MD")
+
+fit_logistic = homicide_analysis %>% 
+  glm(resolved_status ~ victim_age + victim_sex + victim_race, family = binomial(), data = .)
+  
+fit_logistic = fit_logistic %>% 
+  broom::tidy() %>% 
+  mutate(
+    OR = exp(estimate),
+    LB = exp(estimate - 1.96*std.error),
+    UB = exp(estimate + 1.96*std.error)
+    ) %>% 
+  select(term, estimate, OR, LB, UB) 
+
+fit_logistic %>% 
+  knitr::kable(digits = 3)
+```
+
+After adjusting for victim age and victim race, the odds ratio for solving homicides comparing male victims to female victims is `r fit_logistic %>% filter(term == "victim_sexMale") %>% select(OR)`. The 95% confidence interval for the adjusted odds ratio is (`r fit_logistic %>% filter(term == "victim_sexMale") %>% select(LB)`, `r fit_logistic %>% filter(term == "victim_sexMale") %>% select(UB)`).
+
+Interpretation: The odds for solving homicides for male victims is 0.426 times the odds for solving homicides for female victims. We are 95% confidence that the true odds ratio lies between 0.325 and	0.558.
 
 
 # Problem 3
