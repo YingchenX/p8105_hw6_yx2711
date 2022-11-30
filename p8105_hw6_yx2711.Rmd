@@ -14,6 +14,7 @@ set.seed(1)
 knitr::opts_chunk$set(
 	echo = TRUE,
 	warning = FALSE,
+	message = FALSE,
 	fig.width = 8, 
   fig.height = 6,
   out.width = "90%"
@@ -44,5 +45,32 @@ weather_df =
     tmin = tmin / 10,
     tmax = tmax / 10) %>%
   select(name, id, everything())
+```
+
+# Problem 2
+```{r}
+homicide = read.csv("data/homicide-data.csv") %>% 
+  janitor::clean_names() %>% 
+  mutate(
+    city_state = str_c(city, ", ", state),
+    solved_status = case_when(
+      disposition %in% c("Closed without arrest", "Open/No arrest") ~ "No",
+      disposition == "Closed by arrest" ~ "Yes"
+    )
+  ) %>% 
+  filter(
+    !city_state %in% c("Dallas, TX", "Phoenix, AZ", "Kansas City, MO", "Tulsa, AL")
+  )
+
+homicide_analysis = homicide %>% 
+  filter(victim_race %in% c("White", "Black")) %>% 
+  mutate(victim_age = as.numeric(victim_age))
+```
+
+
+# Problem 3
+```{r}
+birthweight = read.csv("data/birthweight.csv") %>% 
+  janitor::clean_names()
 ```
 
