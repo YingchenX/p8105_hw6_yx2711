@@ -216,8 +216,46 @@ Also, New York, NY has the narrowest confidence interval for the odds ratio and 
 
 
 # Problem 3
+
+Load the data and create the dataframe `birthweight`.
 ```{r}
 birthweight = read.csv("data/birthweight.csv") %>% 
-  janitor::clean_names()
+  janitor::clean_names() %>% 
+  mutate(
+    babysex = as.factor(babysex),
+    frace = as.factor(frace),
+    malform = as.factor(malform),
+    mrace = as.factor(mrace)
+  ) %>% 
+  mutate_if(is.factor, fct_infreq)
 ```
+
+
+Fit a model with birthweight as the outcome and mother's age at delivery and mother's race as the predictors. 
+```{r}
+fit_magerace = lm(bwt ~ momage + mrace, data = birthweight)
+
+
+birthweight %>% 
+  add_residuals(fit_magerace) %>% 
+  add_predictions(fit_magerace) %>%  
+  ggplot(aes(x = resid, y = pred)) +
+  geom_point()
+```
+
+
+Fit models: 
+*   using length at birth and gestational age as predictors
+*   using head circumference, length, sex and all interactions as predictors
+```{r}
+fit_lengthage = birthweight %>% 
+  lm(bwt ~ blength + gaweeks, data = .) %>% 
+  broom::tidy()
+
+fit_3way = birthweight %>% 
+  lm(bwt ~ bhead + blength + babysex + bhead * blength + bhead * babysex + blength * babysex + bhead * blength * babysex, data = .) %>% 
+  broom::tidy()
+```
+
+
 
