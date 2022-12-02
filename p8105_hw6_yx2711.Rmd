@@ -132,15 +132,65 @@ fit_logistic = fit_logistic %>%
     LB = exp(estimate - 1.96*std.error),
     UB = exp(estimate + 1.96*std.error)
     ) %>% 
-  select(term, estimate, OR, LB, UB) 
+  filter(term == "victim_sexMale") %>% 
+  select(term, estimate, OR, LB, UB) %>% 
+  mutate_if(is.numeric, round, 3)
+
 
 fit_logistic %>% 
-  knitr::kable(digits = 3)
+  knitr::kable()
 ```
 
-After adjusting for victim age and victim race, the odds ratio for solving homicides comparing male victims to female victims is `r fit_logistic %>% filter(term == "victim_sexMale") %>% select(OR)`. The 95% confidence interval for the adjusted odds ratio is (`r fit_logistic %>% filter(term == "victim_sexMale") %>% select(LB)`, `r fit_logistic %>% filter(term == "victim_sexMale") %>% select(UB)`).
+After adjusting for victim age and victim race, the odds ratio for solving homicides comparing male victims to female victims is `r fit_logistic %>% select(OR)`. The 95% confidence interval for the adjusted odds ratio is (`r fit_logistic %>% select(LB)`, `r fit_logistic %>% select(UB)`).
 
-Interpretation: The odds for solving homicides for male victims is 0.426 times the odds for solving homicides for female victims. We are 95% confidence that the true odds ratio lies between 0.325 and	0.558.
+Interpretation: The odds for solving homicides for male victims is`r fit_logistic %>% select(OR)` times the odds for solving homicides for female victims. We are 95% confidence that the true odds ratio lies between `r fit_logistic %>% select(LB)` and `r fit_logistic %>% select(UB)`.
+
+
+Write a `function(x)` for repeating the process of logisic regression.
+```{r}
+
+logit_reg = function(x){
+  
+  analysis = x %>% 
+    filter(
+    victim_race %in% c("White", "Black"))
+  
+  logit_reg = analysis %>% 
+  glm(resolved_status ~ victim_age + victim_sex + victim_race, 
+      family = binomial(), data = .) 
+  
+  logit_reg = logit_reg %>% 
+  broom::tidy() %>% 
+  mutate(
+    OR = exp(estimate),
+    LB = exp(estimate - 1.96*std.error),
+    UB = exp(estimate + 1.96*std.error)
+    ) %>% 
+  filter(term == "victim_sexMale") %>% 
+  select(term, estimate, OR, LB, UB) %>% 
+  mutate_if(is.numeric, round, 3)
+  
+  logit_reg
+}
+```
+
+
+Nesting the unrelated columns.
+Map the nested data to the function `logit_reg` to iterate the process of logistic regression to each city.
+```{r, cache = TRUE}
+homicide_nest = homicide %>%
+  select(city_state, everything()) %>% 
+  nest(data = c(uid:disposition, resolved_status))
+
+
+city_logistic = homicide_nest %>% 
+  mutate(reg = map(data, logit_reg)) %>% 
+  unnest(reg) %>% 
+  select(city_state, OR, LB, UB)
+ 
+city_logistic %>% 
+  knitr::kable()
+```
 
 
 # Problem 3
