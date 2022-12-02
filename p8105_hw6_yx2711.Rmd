@@ -222,40 +222,77 @@ Load the data and create the dataframe `birthweight`.
 birthweight = read.csv("data/birthweight.csv") %>% 
   janitor::clean_names() %>% 
   mutate(
-    babysex = as.factor(babysex),
-    frace = as.factor(frace),
-    malform = as.factor(malform),
-    mrace = as.factor(mrace)
+    babysex = recode_factor(babysex, `1` = "male", `2` = "female"),
+    frace = recode_factor(frace, `1` = "White", `2` = "Black", `3` = "Asian", `4` = "Puerto Rican", `8` = "Other", `9` = "Unknown"),
+    malform = recode_factor(malform, `0` = "absent", `1` = "present"),
+    mrace = recode_factor(mrace, `1` = "White", `2` = "Black", `3` = "Asian", `4` = "Puerto Rican", `8` = "Other")
   ) %>% 
-  mutate_if(is.factor, fct_infreq)
+  mutate_if(is.factor, fct_infreq) %>% 
+  drop_na()
 ```
 
 
-Fit a model with birthweight as the outcome and mother's age at delivery and mother's race as the predictors. 
+I would like to assess whether mother's age at delivery and mother's race would affect the baby's birthweight and whether the effect of mother's age on baby's birthweight would be different on different level of mother's race.
+Fit a model with birthweight as the outcome and mother's age at delivery, mother's race, and their interaction as the predictors. 
 ```{r}
-fit_magerace = lm(bwt ~ momage + mrace, data = birthweight)
-
+mymodel = lm(bwt ~ momage + mrace + momage * mrace, data = birthweight)
 
 birthweight %>% 
-  add_residuals(fit_magerace) %>% 
-  add_predictions(fit_magerace) %>%  
-  ggplot(aes(x = resid, y = pred)) +
+  add_residuals(mymodel) %>% 
+  add_predictions(mymodel) %>%  
+  ggplot(aes(x = pred, y = resid, color = mrace)) +
   geom_point()
 ```
 
 
 Fit models: 
-*   using length at birth and gestational age as predictors
-*   using head circumference, length, sex and all interactions as predictors
+1)    using length at birth and gestational age as predictors
+2)    using head circumference, length, sex and all interactions as predictors
 ```{r}
-fit_lengthage = birthweight %>% 
+model1 = birthweight %>% 
   lm(bwt ~ blength + gaweeks, data = .) %>% 
   broom::tidy()
 
-fit_3way = birthweight %>% 
+model2 = birthweight %>% 
   lm(bwt ~ bhead + blength + babysex + bhead * blength + bhead * babysex + blength * babysex + bhead * blength * babysex, data = .) %>% 
   broom::tidy()
 ```
 
 
+Compare my model with the two purposed models using `crossv_mc`.
+Use `mutate`+`map` & `map2` to fit models to training data and obtain corresponding RMSEs for the testing data.
+```{r}
+cv_df =
+  crossv_mc(birthweight, 100) %>% 
+  mutate(
+    train = map(train, as_tibble),
+    test = map(test, as_tibble))
 
+cv_df = 
+  cv_df %>% 
+  mutate(
+    mymodel  = map(train, ~lm(bwt ~ momage + mrace + momage * mrace, data = .x)),
+    model1   = map(train, ~lm(bwt ~ blength + gaweeks, data = .x)),
+    model2   = map(train, ~lm(bwt ~ bhead + blength + babysex + bhead * blength + bhead * babysex + blength * babysex + bhead * blength * babysex, data = .x))) %>% 
+  mutate(
+    rmse_mymodel = map2_dbl(mymodel, test, ~rmse(model = .x, data = .y)),
+    rmse_model1    = map2_dbl(model1, test, ~rmse(model = .x, data = .y)),
+    rmse_model2 = map2_dbl(model2, test, ~rmse(model = .x, data = .y)))
+```
+
+
+PLot the predicton error distribution for each models. 
+```{r}
+cv_df %>% 
+  select(starts_with("rmse")) %>% 
+  pivot_longer(
+    everything(),
+    names_to = "model", 
+    values_to = "rmse",
+    names_prefix = "rmse_") %>% 
+  mutate(model = fct_inorder(model)) %>% 
+  ggplot(aes(x = model, y = rmse)) + geom_violin()
+```
+
+Since lower values of RMSE indicate better fit, the plot suggests that model 2, which uses head circumference, length, sex, and all interactions as the predictors, has the better fit.
+My model which uses mother's age at delivery and mother's race as the predictors has the worst fit. 
