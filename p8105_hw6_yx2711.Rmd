@@ -141,9 +141,9 @@ fit_logistic %>%
   knitr::kable()
 ```
 
-After adjusting for victim age and victim race, the odds ratio for solving homicides comparing male victims to female victims is `r fit_logistic %>% select(OR)`. The 95% confidence interval for the adjusted odds ratio is (`r fit_logistic %>% select(LB)`, `r fit_logistic %>% select(UB)`).
+After limiting the analysis for whom `victim_race` is `white` or `black` and adjusting for victim age and victim race, the odds ratio for solving homicides comparing male victims to female victims is `r fit_logistic %>% select(OR)`. The 95% confidence interval for the adjusted odds ratio is (`r fit_logistic %>% select(LB)`, `r fit_logistic %>% select(UB)`).
 
-Interpretation: The odds for solving homicides for male victims is`r fit_logistic %>% select(OR)` times the odds for solving homicides for female victims. We are 95% confidence that the true odds ratio lies between `r fit_logistic %>% select(LB)` and `r fit_logistic %>% select(UB)`.
+Interpretation: The odds for solving homicides for male victims is`r fit_logistic %>% select(OR)` times the odds for solving homicides for female victims after adjusting for victim age and victim race. We are 95% confidence that the true odds ratio lies between `r fit_logistic %>% select(LB)` and `r fit_logistic %>% select(UB)`.
 
 
 Write a `function(x)` for repeating the process of logisic regression.
@@ -191,6 +191,28 @@ city_logistic = homicide_nest %>%
 city_logistic %>% 
   knitr::kable()
 ```
+
+Create a plot that shows the estimate ORs and CIs for each city.
+
+```{r}
+city_logistic %>% 
+  mutate(
+    city_state = fct_reorder(city_state, OR)
+  ) %>% 
+  ggplot(aes(city_state, OR)) + 
+  geom_point() +
+  geom_errorbar(aes(ymin = LB, ymax = UB)) +
+  labs(
+    title = "The estimated ORs and CIs for each city",
+    x = "City, State",
+    y = "Estimated OR") +
+  theme(axis.text.x = element_text(angle = 90))
+```
+
+New York, NY has the lowest odds ratio and Albuquerque, NM has the highest odds ratio for solving homicides comparing male victims to female victims. This finding suggests that male victims in New York, NY have the lowest odds for solving homicides comparing to female victims, whereas male victims in Albuquerque, NM have the highest odds for solving homicides comparing to female victims.
+
+Also, New York, NY has the narrowest confidence interval for the odds ratio and Albuquerque, NM has the widest confidence interval for the odds ratio. The variation in the estimated ORs for Albuquerque, NM is the highest and for New York, NY is the lowest.
+
 
 
 # Problem 3
