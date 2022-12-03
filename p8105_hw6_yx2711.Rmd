@@ -52,9 +52,9 @@ weather_df =
 ```
 
 
-```{r}
+```{r, cache=TRUE}
 weather_df %>% 
-  modelr::bootstrap(n = 1000) %>% 
+  modelr::bootstrap(n = 5000) %>% 
   mutate(
     models = map(strap, ~lm(tmax ~ tmin, data = .x) ),
     results = map(models, broom::glance)) %>% 
@@ -67,9 +67,9 @@ In this example, the $\hat{r}^2$ value is high, and the upper bound at 1 may be 
 
 We can produce a distribution for $\log(\beta_0 * \beta1)$ using a similar approach, with a bit more wrangling before we make our plot.
 
-```{r}
+```{r, cache=TRUE}
 weather_df %>% 
-  modelr::bootstrap(n = 1000) %>% 
+  modelr::bootstrap(n = 5000) %>% 
   mutate(
     models = map(strap, ~lm(tmax ~ tmin, data = .x) ),
     results = map(models, broom::tidy)) %>% 
@@ -211,13 +211,15 @@ city_logistic %>%
 
 New York, NY has the lowest odds ratio and Albuquerque, NM has the highest odds ratio for solving homicides comparing male victims to female victims. This finding suggests that male victims in New York, NY have the lowest odds for solving homicides comparing to female victims, whereas male victims in Albuquerque, NM have the highest odds for solving homicides comparing to female victims.
 
-Also, New York, NY has the narrowest confidence interval for the odds ratio and Albuquerque, NM has the widest confidence interval for the odds ratio. The variation in the estimated ORs for Albuquerque, NM is the highest and for New York, NY is the lowest.
+Also, Chicago, IL has the narrowest confidence interval for the odds ratio and Albuquerque, NM has the widest confidence interval for the odds ratio. The variation in the estimated ORs for Albuquerque, NM is the highest and for Chicago, IL is the lowest.
 
 
 
 # Problem 3
 
 Load the data and create the dataframe `birthweight`.
+Mutate categorical variables `babysex`, `frace`, `malform`, `mrace` into factor variables and recode them using `recode_factor`.
+Drop all the missing value using `drop_na`.
 ```{r}
 birthweight = read.csv("data/birthweight.csv") %>% 
   janitor::clean_names() %>% 
@@ -235,13 +237,18 @@ birthweight = read.csv("data/birthweight.csv") %>%
 I would like to assess whether mother's age at delivery and mother's race would affect the baby's birthweight and whether the effect of mother's age on baby's birthweight would be different on different level of mother's race.
 Fit a model with birthweight as the outcome and mother's age at delivery, mother's race, and their interaction as the predictors. 
 ```{r}
-mymodel = lm(bwt ~ momage + mrace + momage * mrace, data = birthweight)
+mymodel = lm(bwt ~ momage * mrace, data = birthweight)
 
 birthweight %>% 
   add_residuals(mymodel) %>% 
   add_predictions(mymodel) %>%  
   ggplot(aes(x = pred, y = resid, color = mrace)) +
-  geom_point()
+  geom_point() +
+  labs(
+    title = "Model residuals against fitted values",
+    x = "Fitted values of birthweight",
+    y = "Residuals")
+  
 ```
 
 
@@ -254,7 +261,7 @@ model1 = birthweight %>%
   broom::tidy()
 
 model2 = birthweight %>% 
-  lm(bwt ~ bhead + blength + babysex + bhead * blength + bhead * babysex + blength * babysex + bhead * blength * babysex, data = .) %>% 
+  lm(bwt ~ bhead * blength * babysex, data = .) %>% 
   broom::tidy()
 ```
 
@@ -271,9 +278,9 @@ cv_df =
 cv_df = 
   cv_df %>% 
   mutate(
-    mymodel  = map(train, ~lm(bwt ~ momage + mrace + momage * mrace, data = .x)),
+    mymodel  = map(train, ~lm(bwt ~ momage * mrace, data = .x)),
     model1   = map(train, ~lm(bwt ~ blength + gaweeks, data = .x)),
-    model2   = map(train, ~lm(bwt ~ bhead + blength + babysex + bhead * blength + bhead * babysex + blength * babysex + bhead * blength * babysex, data = .x))) %>% 
+    model2   = map(train, ~lm(bwt ~ bhead * blength * babysex, data = .x))) %>% 
   mutate(
     rmse_mymodel = map2_dbl(mymodel, test, ~rmse(model = .x, data = .y)),
     rmse_model1    = map2_dbl(model1, test, ~rmse(model = .x, data = .y)),
@@ -281,7 +288,7 @@ cv_df =
 ```
 
 
-PLot the predicton error distribution for each models. 
+Plot the prediction error distribution for each models. 
 ```{r}
 cv_df %>% 
   select(starts_with("rmse")) %>% 
@@ -291,7 +298,12 @@ cv_df %>%
     values_to = "rmse",
     names_prefix = "rmse_") %>% 
   mutate(model = fct_inorder(model)) %>% 
-  ggplot(aes(x = model, y = rmse)) + geom_violin()
+  ggplot(aes(x = model, y = rmse)) + 
+  geom_violin() +
+  labs(
+    title = "The prediction error distribution for each candidate model",
+    x = "Model",
+    y = "RMSE") 
 ```
 
 Since lower values of RMSE indicate better fit, the plot suggests that model 2, which uses head circumference, length, sex, and all interactions as the predictors, has the better fit.
